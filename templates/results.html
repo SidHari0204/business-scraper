@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Search Results</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+    <div class="container mt-5">
+        <h2 class="text-center mb-4">Results for <strong>{{ category }}</strong> in <strong>{{ city }}</strong></h2>
+        <a href="/" class="btn btn-secondary mb-3">🔙 Back</a>
+        {% if results %}
+        <div class="list-group">
+            {% for r in results %}
+                <div class="list-group-item py-3">
+                    <h5 class="mb-1">{{ r.name }}</h5>
+                    <p class="mb-1"><strong> Address:</strong> {{ r.address }}</p>
+                    <p class="mb-1"><strong> Phone:</strong> {{ r.phone or 'Not found' }}</p>
+                    <p class="mb-1"><strong> Rating:</strong> {{ r.rating or 'Not rated' }}</p>
+                </div>
+            {% endfor %}
+        </div>
+        {% else %}
+            <p>No results found.</p>
+        {% endif %}
+    </div>
+</body>
+</html>
