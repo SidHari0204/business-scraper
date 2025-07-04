@@ -1,6 +1,6 @@
 services:
   - type: web
     name: business-scraper
-    runtime: python
-    buildCommand: bash build.sh
-    startCommand: gunicorn app:app
+    runtime: docker
+    buildCommand: ""
+    startCommand: ""
