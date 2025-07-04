@@ -20,7 +20,7 @@ def setup_driver():
         "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
     )
     # Use Chromium on Render (Chrome isn't installed by default)
-    chrome_options.binary_location = "/usr/bin/chromium-browser"
+    chrome_options.binary_location = "/usr/bin/chromium"
     return webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
 
 def scrape_google_maps(city, category, limit=20):  # Reduced limit to avoid rate limits

@@ -2,5 +2,5 @@ services:
   - type: web
     name: business-scraper
     runtime: python
-    buildCommand: pip install -r requirements.txt
+    buildCommand: bash build.sh
     startCommand: gunicorn app:app
