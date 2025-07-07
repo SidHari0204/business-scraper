@@ -55,63 +55,77 @@ def setup_driver():
         except Exception as fallback_error:
             raise RuntimeError(f"All driver initialization failed: {fallback_error}")
 
-def scrape_google_maps(city, category, max_results=10, scroll_attempts=3):
-    """Scrape business listings from Google Maps with robust error handling"""
-    driver = None
+def scrape_google_maps(city, category, max_results=5):
+    driver = setup_driver()
     results = []
-    
     try:
-        driver = setup_driver()
-        query = f"{category} in {city}"
-        driver.get(f"https://www.google.com/maps/search/{query}")
+        print(f"Searching for {category} in {city}")
+        url = f"https://www.google.com/maps/search/{category}+in+{city}"
+        driver.get(url)
         
-        # Wait for results to load
-        results_xpath = '//div[contains(@aria-label, "Results for")]'
-        WebDriverWait(driver, 15).until(
-            EC.presence_of_element_located((By.XPATH, results_xpath)))
+        # Debug: Save initial page
+        driver.save_screenshot("1_initial_load.png")
         
-        # Scroll to load more results
-        scrollable_div = driver.find_element(By.XPATH, results_xpath)
-        for _ in range(scroll_attempts):
-            driver.execute_script(
-                "arguments[0].scrollTop = arguments[0].scrollHeight", 
-                scrollable_div)
-            time.sleep(2.5)  # Increased delay for Render's limited resources
+        # Wait for either results or "no results" message
+        try:
+            WebDriverWait(driver, 15).until(
+                lambda d: d.find_elements(By.XPATH, '//div[contains(@aria-label, "Results for")]') 
+                or d.find_elements(By.XPATH, '//div[contains(text(), "No results found")]'))
+        except Exception as e:
+            print(f"Timeout waiting for results: {e}")
+            driver.save_screenshot("2_timeout_error.png")
+            return []
         
-        # Process business cards
-        cards = driver.find_elements(By.CLASS_NAME, "hfpxzc")[:max_results]
+        # Check for "no results" message
+        if driver.find_elements(By.XPATH, '//div[contains(text(), "No results found")]'):
+            print("Google Maps shows 'No results found'")
+            return []
+            
+        # Scroll and collect business cards
+        scrollable_div = driver.find_element(By.XPATH, '//div[contains(@aria-label, "Results for")]')
         
-        for idx, card in enumerate(cards, 1):
+        for i in range(2):  # Reduced scroll attempts
+            driver.execute_script("arguments[0].scrollTop = arguments[0].scrollHeight", scrollable_div)
+            time.sleep(2)
+            driver.save_screenshot(f"3_scroll_{i}.png")
+        
+        # Get all business cards
+        cards = driver.find_elements(By.XPATH, '//div[contains(@aria-label, "Results for")]//a[contains(@href, "maps/place")]')
+        print(f"Found {len(cards)} business cards")
+        
+        for i, card in enumerate(cards[:max_results]):
             try:
-                # Scroll to and click the card
+                print(f"\nProcessing business {i+1}/{len(cards)}")
                 driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", card)
-                time.sleep(1.2)
+                time.sleep(1)
                 card.click()
-                time.sleep(2.8)  # Allow details to load
+                time.sleep(2)
                 
-                # Extract business information
-                name = WebDriverWait(driver, 8).until(
-                    EC.presence_of_element_located((By.CLASS_NAME, "DUwDvf"))).text
+                # Debug: Save business page
+                driver.save_screenshot(f"4_business_{i}.png")
                 
-                address = driver.find_element(By.CLASS_NAME, "Io6YTe").text
+                # Extract details with fallbacks
+                name = driver.find_element(By.XPATH, '//h1[contains(@class, "fontHeadlineLarge")]').text
+                address = driver.find_element(By.XPATH, '//button[@data-item-id="address"]//div[contains(@class, "fontBodyMedium")]').text
                 
-                # Enhanced phone number extraction
+                # Phone extraction with multiple attempts
                 phone = None
-                for el in driver.find_elements(By.CLASS_NAME, "Io6YTe"):
-                    txt = el.text.strip()
-                    if re.match(r"^(\+?[\d\s\-\(\)]{7,}\d)$", txt):  # Robust international pattern
-                        phone = txt
+                for attempt in range(2):
+                    try:
+                        phone_elem = driver.find_element(By.XPATH, '//button[contains(@data-item-id, "phone")]')
+                        phone = phone_elem.text.split('\n')[-1]
                         break
+                    except:
+                        pass
                 
-                # Rating extraction with fallback
+                # Rating extraction
                 try:
                     rating = float(driver.find_element(
-                        By.CLASS_NAME, "MW4etd").text)
-                except Exception:
+                        By.XPATH, '//div[@aria-label*="stars"]').get_attribute("aria-label").split()[0])
+                except:
                     rating = None
                 
                 results.append({
-                    "position": idx,
                     "name": name,
                     "address": address,
                     "phone": phone,
@@ -119,14 +133,13 @@ def scrape_google_maps(city, category, max_results=10, scroll_attempts=3):
                 })
                 
             except Exception as e:
-                print(f"Error processing card {idx}: {str(e)}")
+                print(f"Error processing business {i+1}: {str(e)}")
                 continue
                 
     except Exception as e:
-        print(f"Scraping failed: {str(e)}")
-        
+        print(f"Fatal error: {str(e)}")
     finally:
-        if driver:
-            driver.quit()
+        driver.quit()
     
+    print(f"\nScraping complete. Found {len(results)} valid results")
     return results
