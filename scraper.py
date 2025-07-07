@@ -8,22 +8,18 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 def setup_driver():
-    """Configure and return a Chrome WebDriver with Render-optimized settings"""
+    """Configure and return a Chrome WebDriver with optimized settings"""
     chrome_options = Options()
     
-    # Essential Render configurations
-    chrome_options.binary_location = "/usr/bin/chromium"
+    # Essential configurations
     chrome_options.add_argument("--headless=new")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--single-process")  # Reduces memory usage
     
-    # Performance and stealth settings
+    # Performance settings
     chrome_options.add_argument("--window-size=1920,1080")
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--disable-extensions")
-    chrome_options.add_argument("--disable-infobars")
-    chrome_options.add_argument("--disable-notifications")
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
     
     # Realistic user agent
@@ -32,25 +28,17 @@ def setup_driver():
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/120.0.0.0 Safari/537.36"
     )
-
+    
     try:
-        # Primary method: Use system chromedriver (most reliable)
-        service = Service("/usr/lib/chromium/chromedriver")
+        # Try with system chromedriver
+        service = Service(executable_path="/usr/bin/chromedriver")
         driver = webdriver.Chrome(service=service, options=chrome_options)
-        
-        # Verify driver works
-        driver.get("about:blank")
         return driver
-        
     except Exception as e:
         print(f"System chromedriver failed: {e}. Falling back to webdriver-manager")
         try:
             from webdriver_manager.chrome import ChromeDriverManager
-            # Fallback with exact version matching
-            service = Service(ChromeDriverManager(
-                version="138.0.7045.6",  # Must match your Chromium version
-                cache_valid_range=30
-            ).install())
+            service = Service(ChromeDriverManager().install())
             return webdriver.Chrome(service=service, options=chrome_options)
         except Exception as fallback_error:
             raise RuntimeError(f"All driver initialization failed: {fallback_error}")
@@ -62,21 +50,21 @@ def scrape_google_maps(city, category, max_results=10, scroll_attempts=3):
     
     try:
         driver = setup_driver()
-        query = f"{category} in {city}"
-        driver.get(f"https://www.google.com/maps/search/{query}")
+        query = f"{category} in {city}".replace(" ", "+")
+        url = f"https://www.google.com/maps/search/{query}"
+        driver.get(url)
         
         # Wait for results to load
-        results_xpath = '//div[contains(@aria-label, "Results for")]'
-        WebDriverWait(driver, 15).until(
-            EC.presence_of_element_located((By.XPATH, results_xpath)))
+        WebDriverWait(driver, 20).until(
+            EC.presence_of_element_located((By.CLASS_NAME, "hfpxzc")))
         
         # Scroll to load more results
-        scrollable_div = driver.find_element(By.XPATH, results_xpath)
+        scrollable_div = driver.find_element(By.CLASS_NAME, "m6QErb.DxyBCb.kA9KIf.dS8AEf")
         for _ in range(scroll_attempts):
             driver.execute_script(
-                "arguments[0].scrollTop = arguments[0].scrollHeight", 
+                "arguments[0].scrollTop = arguments[0].scrollHeight",
                 scrollable_div)
-            time.sleep(2.5)  # Increased delay for Render's limited resources
+            time.sleep(2)
         
         # Process business cards
         cards = driver.find_elements(By.CLASS_NAME, "hfpxzc")[:max_results]
@@ -85,21 +73,25 @@ def scrape_google_maps(city, category, max_results=10, scroll_attempts=3):
             try:
                 # Scroll to and click the card
                 driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", card)
-                time.sleep(1.2)
+                time.sleep(1)
                 card.click()
-                time.sleep(2.8)  # Allow details to load
+                time.sleep(2)  # Allow details to load
                 
                 # Extract business information
-                name = WebDriverWait(driver, 8).until(
+                name = WebDriverWait(driver, 10).until(
                     EC.presence_of_element_located((By.CLASS_NAME, "DUwDvf"))).text
                 
-                address = driver.find_element(By.CLASS_NAME, "Io6YTe").text
+                # Get all info elements
+                info_elements = driver.find_elements(By.CLASS_NAME, "Io6YTe")
                 
-                # Enhanced phone number extraction
+                # Address is usually first element
+                address = info_elements[0].text if len(info_elements) > 0 else "Not found"
+                
+                # Phone number extraction
                 phone = None
-                for el in driver.find_elements(By.CLASS_NAME, "Io6YTe"):
+                for el in info_elements:
                     txt = el.text.strip()
-                    if re.match(r"^(\+?[\d\s\-\(\)]{7,}\d)$", txt):  # Robust international pattern
+                    if re.match(r"^(\+?[\d\s\-\(\)]{7,}\d)$", txt):
                         phone = txt
                         break
                 
@@ -130,3 +122,9 @@ def scrape_google_maps(city, category, max_results=10, scroll_attempts=3):
             driver.quit()
     
     return results
+
+if __name__ == "__main__":
+    results = scrape_google_maps("New York", "restaurants", 5)
+    print(f"Found {len(results)} results:")
+    for biz in results:
+        print(f"{biz['name']} - {biz.get('rating', 'No rating')} stars")
