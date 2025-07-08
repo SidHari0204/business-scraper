@@ -15,5 +15,13 @@ COPY . .
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
+ENV PYTHONUNBUFFERED=1
+ENV DISPLAY=:99
+
+# Add virtual display for headless
+RUN apt-get update && \
+    apt-get install -y xvfb && \
+    rm -rf /var/lib/apt/lists/*
+
 # Run the app with Gunicorn (fixed PORT handling)
 CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:$PORT --timeout 180 --workers 1 --threads 1 --worker-class sync app:app"]

@@ -4,6 +4,15 @@ import os  # Added for Render compatibility
 
 app = Flask(__name__)
 
+@app.route("/debug")
+def debug():
+    try:
+        driver = setup_driver()
+        driver.get("https://www.google.com/maps")
+        return {"status": "success", "title": driver.title}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
 @app.route('/health')
 def health():
     return {'status': 'healthy'}, 200
