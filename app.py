@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request
 from scraper import scrape_google_maps
 import os  # Added for Render compatibility
+from scraper import setup_driver
 
 app = Flask(__name__)
 
