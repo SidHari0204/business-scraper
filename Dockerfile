@@ -16,4 +16,4 @@ COPY . .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Run the app with Gunicorn
-CMD ["gunicorn", "--bind", "0.0.0.0:10000", "app:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:$PORT", "--timeout", "180", "--workers", "1", "--threads", "1", "--worker-class", "sync", "app:app"]

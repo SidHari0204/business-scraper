@@ -4,6 +4,10 @@ import os  # Added for Render compatibility
 
 app = Flask(__name__)
 
+@app.route('/health')
+def health():
+    return {'status': 'healthy'}, 200
+
 @app.route("/", methods=["GET", "POST"])
 def index():
     if request.method == "POST":
