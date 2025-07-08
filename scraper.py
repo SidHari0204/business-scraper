@@ -43,7 +43,7 @@ def setup_driver():
         except Exception as fallback_error:
             raise RuntimeError(f"All driver initialization failed: {fallback_error}")
 
-def scrape_google_maps(city, category, max_results=5, scroll_attempts=2):
+def scrape_google_maps(city, category, max_results=1, scroll_attempts=1):
     """Scrape business listings from Google Maps with robust error handling"""
     driver = None
     results = []
